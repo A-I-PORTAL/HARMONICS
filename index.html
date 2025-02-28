@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Mobile optimization -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Aurora Harmonics: The Cosmic Synthesizer</title>
+  <!-- Load a rounded, modern sans-serif font -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* Reset and base styling */
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+      font-family: 'Quicksand', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      height: 100%;
+    }
+    /* Fullscreen canvas */
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    /* Splash screen styling */
+    #splash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      color: #fff;
+      font-size: 2em;
+      text-align: center;
+      padding: 20px;
+      cursor: pointer;
+    }
+    #splash h1 {
+      margin: 0;
+      padding: 0.5em;
+    }
+    #splash p {
+      margin: 0;
+      padding: 0.5em;
+      font-size: 1em;
+    }
+  </style>
+</head>
+<body>
+  <!-- Fullscreen canvas for drawing our instrument -->
+  <canvas id="canvas"></canvas>
+  <!-- Splash screen overlay -->
+  <div id="splash">
+    <h1>Aurora Harmonics</h1>
+    <p>Touch or Click to Begin Your Cosmic Journey</p>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      const splash = document.getElementById('splash');
+
+      // Set canvas dimensions to full viewport
+      function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      // Set up Web Audio API
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioContext();
+
+      // Ripple effect class for touch visualizations
+      class Ripple {
+        constructor(x, y) {
+          this.x = x;
+          this.y = y;
+          this.radius = 0;
+          this.maxRadius = Math.random() * 100 + 50;
+          this.lineWidth = 3;
+          this.alpha = 1;
+        }
+        update() {
+          this.radius += 2;
+          this.alpha -= 0.02;
+        }
+        draw(ctx) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(255, 255, 255, " + this.alpha + ")";
+          ctx.lineWidth = this.lineWidth;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+      const ripples = [];
+
+      // Function to play a note; frequency is mapped from the x-coordinate
+      function playSound(x) {
+        const frequency = 200 + (x / window.innerWidth) * 800; // 200Hz to ~1000Hz
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.type = 'sine';
+        oscillator.frequency.value = frequency;
+        gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 1);
+      }
+
+      // Handle user touch/mouse input: play note and trigger ripple
+      function handleInput(e) {
+        e.preventDefault();
+        let x, y;
+        if (e.touches && e.touches.length) {
+          x = e.touches[0].clientX;
+          y = e.touches[0].clientY;
+        } else {
+          x = e.clientX;
+          y = e.clientY;
+        }
+        // Resume AudioContext on first interaction if needed
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        playSound(x);
+        ripples.push(new Ripple(x, y));
+        // Hide splash screen with a fade-out effect if visible
+        if (splash.style.display !== "none") {
+          splash.style.transition = "opacity 1s";
+          splash.style.opacity = 0;
+          setTimeout(() => {
+            splash.style.display = "none";
+          }, 1000);
+        }
+      }
+
+      // Attach input listeners to both the canvas and splash screen
+      canvas.addEventListener('touchstart', handleInput, false);
+      canvas.addEventListener('mousedown', handleInput, false);
+      splash.addEventListener('touchstart', handleInput, false);
+      splash.addEventListener('mousedown', handleInput, false);
+
+      // Main animation loop: dynamic background and ripple updates
+      function animate() {
+        // Create a shifting radial gradient background
+        const time = Date.now() * 0.0002;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const maxRadius = Math.max(canvas.width, canvas.height) / 1.5;
+        const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxRadius);
+        gradient.addColorStop(0, "hsl(" + (time * 50 % 360) + ", 60%, 20%)");
+        gradient.addColorStop(1, "#000");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Update and draw each ripple
+        for (let i = ripples.length - 1; i >= 0; i--) {
+          const ripple = ripples[i];
+          ripple.update();
+          ripple.draw(ctx);
+          if (ripple.alpha <= 0) {
+            ripples.splice(i, 1);
+          }
+        }
+        requestAnimationFrame(animate);
+      }
+      animate();
+    });
+  </script>
+</body>
+</html>
